@@ -1,0 +1,8 @@
+crewai[google-genai]==1.15.6
+chromadb==1.1.1
+langchain-ollama==1.1.0
+nemoguardrails==0.23.0
+pandas==2.3.3
+plotly==6.9.0
+requests==2.34.2
+streamlit==1.60.0

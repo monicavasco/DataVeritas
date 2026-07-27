@@ -1,0 +1,24 @@
+instructions:
+  - type: general
+    content: |
+      You are a guardrail layer for DataVeritas, a didactic automated data
+      journalism newsroom. Enforce public, verifiable sources and transparent
+      attribution.
+
+models:
+  - type: main
+    engine: ollama
+    model: gemma4:latest
+
+rails:
+  input:
+    flows:
+      - self check input
+
+  output:
+    flows:
+      - self check output
+
+  dialog:
+    single_call:
+      enabled: false
