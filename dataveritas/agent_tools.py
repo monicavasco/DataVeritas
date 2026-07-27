@@ -1788,6 +1788,145 @@ class WritingEvidenceMatrixTool(BaseTool):
         )
 
 
+class CrossUfComparisonTool(BaseTool):
+    name: str = "comparar_ufs"
+    description: str = (
+        "Compara o estado selecionado com os demais no ranking do pacote population_ibge. "
+        "Retorna media, mediana, posicao relativa e distancia da media do estado escolhido. "
+        "Use apenas quando o dataset for population_ibge e houver ranking_2024 disponivel."
+    )
+    _dataset: dict = PrivateAttr(default_factory=dict)
+
+    def __init__(self, dataset: dict, **kwargs: Any) -> None:
+        super().__init__(max_usage_count=3, **kwargs)
+        self._dataset = dataset
+
+    def _run(self, comparison_field: str = "populacao_2024") -> str:
+        if self._dataset.get("tipo") != "population_ibge":
+            return _json(
+                {
+                    "ok": False,
+                    "mensagem": "Esta tool e valida apenas para datasets do tipo population_ibge.",
+                    "tipo_dataset": self._dataset.get("tipo"),
+                }
+            )
+
+        rows = self._dataset.get("ranking_2024", [])
+        if not rows or not isinstance(rows, list):
+            return _json({"ok": False, "mensagem": "Campo ranking_2024 nao encontrado ou vazio no pacote."})
+
+        values: list[float] = []
+        selected_item: dict[str, Any] | None = None
+
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            value = _numeric_value(row, comparison_field)
+            if value is None:
+                continue
+            values.append(value)
+            if row.get("selecionado") or row.get("id") == self._dataset.get("estado_id"):
+                selected_item = row
+
+        if len(values) < 2:
+            return _json({"ok": False, "mensagem": "Dados insuficientes para comparacao entre UFs."})
+
+        mean = sum(values) / len(values)
+        sorted_values = sorted(values)
+        mid = len(sorted_values) // 2
+        median = (sorted_values[mid - 1] + sorted_values[mid]) / 2 if len(sorted_values) % 2 == 0 else sorted_values[mid]
+
+        selected_value = _numeric_value(selected_item, comparison_field) if selected_item else None
+        selected_name = selected_item.get("nome") if selected_item else None
+        selected_rank = _numeric_value(selected_item, "rank_2024") if selected_item else None
+
+        comparison: dict[str, Any] = {
+            "campo_comparado": comparison_field,
+            "total_ufs_no_ranking": len(values),
+            "media_nacional": round(mean, 2),
+            "mediana_nacional": round(median, 2),
+            "maior_valor": round(max(values), 2),
+            "menor_valor": round(min(values), 2),
+        }
+
+        if selected_item is not None and selected_value is not None:
+            distancia_media = selected_value - mean
+            pct_acima_media = (distancia_media / mean) * 100 if mean else None
+            comparison["uf_selecionada"] = {
+                "nome": selected_name,
+                "rank": selected_rank,
+                "valor": round(selected_value, 2),
+                "distancia_da_media": round(distancia_media, 2),
+                "pct_em_relacao_a_media": round(pct_acima_media, 2) if pct_acima_media is not None else None,
+                "acima_da_media": distancia_media > 0,
+            }
+        else:
+            comparison["aviso"] = "Estado selecionado nao identificado no ranking; use DatasetFieldLookupTool para localizar estado_id."
+
+        return _json({"ok": True, **comparison})
+
+
+class DatasetCompletionCheckTool(BaseTool):
+    name: str = "verificar_completude_pacote"
+    description: str = (
+        "Verifica se os campos obrigatorios do pacote estao presentes: tipo, fontes, "
+        "coletado_em, resumo_numerico, nota_metodologica. Para tipos especificos verifica "
+        "campos adicionais (ex.: taxa_mortalidade_por_mil para mortality_rj). "
+        "Use no inicio da coleta e antes da redacao para saber o que falta."
+    )
+    _dataset: dict = PrivateAttr(default_factory=dict)
+
+    _REQUIRED_BASE = ("tipo", "fontes", "coletado_em", "resumo_numerico", "nota_metodologica")
+    _REQUIRED_BY_TYPE: dict[str, tuple[str, ...]] = {
+        "mortality_rj": ("taxa_mortalidade_por_mil", "obitos_residentes", "populacao_residente"),
+        "population_ibge": ("populacao_final", "variacao_percentual", "rank_uf_2024", "ranking_2024"),
+        "selic_bcb": ("valor_final", "valor_inicial", "observacoes"),
+        "ipca_ibge": ("variacao_acumulada_12m", "media_periodo", "observacoes"),
+        "emendas_cgu": ("total_empenhado", "total_pago", "registros"),
+        "worldbank_wdi": ("indicador_codigo", "valor_mais_recente", "observacoes"),
+    }
+
+    def __init__(self, dataset: dict, **kwargs: Any) -> None:
+        super().__init__(max_usage_count=2, **kwargs)
+        self._dataset = dataset
+
+    def _run(self) -> str:
+        dataset_type = self._dataset.get("tipo") or ""
+        required_fields = list(self._REQUIRED_BASE)
+        extra_required = list(self._REQUIRED_BY_TYPE.get(dataset_type, ()))
+        all_required = required_fields + extra_required
+
+        present: list[str] = []
+        absent: list[str] = []
+        for field in all_required:
+            value = self._dataset.get(field)
+            has_value = value is not None and value != "" and value != [] and value != {}
+            if has_value:
+                present.append(field)
+            else:
+                absent.append(field)
+
+        completude_pct = round(len(present) / len(all_required) * 100, 1) if all_required else 100.0
+        warnings: list[str] = []
+        if not self._dataset.get("fontes"):
+            warnings.append("Pacote sem URLs de fontes citaveis.")
+        if dataset_type == "open_data_discovery":
+            warnings.append("Tipo open_data_discovery nao contem dados numericos estruturados; use coletor especifico.")
+
+        return _json(
+            {
+                "ok": not absent,
+                "tipo_dataset": dataset_type,
+                "completude_pct": completude_pct,
+                "campos_presentes": present,
+                "campos_ausentes": absent,
+                "campos_obrigatorios_base": required_fields,
+                "campos_obrigatorios_por_tipo": extra_required,
+                "avisos": warnings,
+            }
+        )
+
+
 @dataclass(frozen=True)
 class NewsroomToolset:
     collector: list[BaseTool]
@@ -1835,6 +1974,8 @@ def build_newsroom_toolset(
         collector_tools.append(PublicPortalSearchTool(dataset, default_query=user_request))
         collector_tools.append(TabularResourceDownloadTool(dataset))
 
+    collector_tools.append(DatasetCompletionCheckTool(dataset))
+
     return NewsroomToolset(
         collector=collector_tools,
         analyst=[
@@ -1847,6 +1988,8 @@ def build_newsroom_toolset(
             RankingGenerationTool(dataset),
             OutlierDetectionTool(dataset),
             IndicatorFormulaValidationTool(dataset),
+            CrossUfComparisonTool(dataset),
+            DatasetCompletionCheckTool(dataset),
         ],
         writer=[
             DatasetFieldLookupTool(dataset),
@@ -1858,6 +2001,7 @@ def build_newsroom_toolset(
             SourceCitationCheckTool(dataset),
             TransparencyReviewTool(dataset),
             WritingEvidenceMatrixTool(dataset),
+            DatasetCompletionCheckTool(dataset),
         ],
     )
 
@@ -1938,6 +2082,9 @@ def run_required_tools(toolset: NewsroomToolset | None, user_request: str = "") 
         ("analista", toolset.analyst, "gerar_ranking", {}, False),
         ("analista", toolset.analyst, "detectar_outliers", {}, False),
         ("analista", toolset.analyst, "validar_formula_indicador", {}, False),
+        ("analista", toolset.analyst, "verificar_completude_pacote", {}, False),
+        ("analista", toolset.analyst, "comparar_ufs", {}, False),
+        ("redator", toolset.writer, "verificar_completude_pacote", {}, False),
         ("redator", toolset.writer, "consultar_campo_pacote", {"field_path": "fontes"}, True),
         ("redator", toolset.writer, "auditar_fontes_publicas", {}, True),
     ]
