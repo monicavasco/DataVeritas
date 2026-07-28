@@ -24,6 +24,7 @@ A partir de uma pauta em texto livre (ex: *"população estimada em Minas Gerais
 | IBGE | Estruturado | População estimada por UF (2024) |
 | Banco Central | Estruturado | Taxa Selic — série histórica |
 | SIM / SES-RJ + IBGE | Estruturado | Mortalidade no Rio de Janeiro |
+| Prefeitura de Araruama | Estruturado | Notícias oficiais do portal municipal |
 | dados.gov.br, OMS GHO, ONU SDG, Câmara | Descoberta | Metadados de fontes abertas |
 
 O catálogo RAG inclui ainda: DATASUS, INEP, Ipeadata, TSE, Portal da Transparência, Senado, IBGE SIDRA, Banco Mundial e OCDE — prontos para receber coletores estruturados.
@@ -116,6 +117,7 @@ dataveritas/
 ├── guardrails.py      # Guardrails determinísticos e domínios permitidos
 ├── rag.py             # Banco vetorial ChromaDB e recomendação de fonte
 ├── source_catalog.py  # Catálogo de fontes públicas conhecidas
+├── araruama.py        # Coletor Prefeitura de Araruama — notícias oficiais
 ├── ibge.py            # Coletor IBGE — população por UF
 ├── bcb.py             # Coletor BCB — taxa Selic
 ├── mortality.py       # Coletor SIM/SES-RJ — mortalidade

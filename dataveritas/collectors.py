@@ -7,6 +7,7 @@ from dataveritas.bcb import build_selic_dataset
 from dataveritas.ibge import StateOption, build_population_dataset
 from dataveritas.mortality import build_mortality_dataset
 from dataveritas.open_data import build_open_data_discovery_dataset
+from dataveritas.araruama import build_araruama_news_dataset
 
 
 CollectorInputKind = Literal["state", "query", "none"]
@@ -36,6 +37,7 @@ POPULATION_SOURCE_TYPE = "population_ibge"
 SELIC_SOURCE_TYPE = "selic_bcb"
 MORTALITY_RJ_SOURCE_TYPE = "mortality_rj"
 OPEN_DATA_SOURCE_TYPE = "open_data_discovery"
+ARARUAMA_NEWS_SOURCE_TYPE = "araruama_news"
 
 
 COLLECTOR_DEFINITIONS: tuple[CollectorDefinition, ...] = (
@@ -185,6 +187,29 @@ COLLECTOR_DEFINITIONS: tuple[CollectorDefinition, ...] = (
             ),
         ),
     ),
+    CollectorDefinition(
+        source_type=ARARUAMA_NEWS_SOURCE_TYPE,
+        source_label="Noticias de Araruama (Prefeitura)",
+        collector_name="build_araruama_news_dataset",
+        input_kind="query",
+        cache_ttl_seconds=900,
+        structured=False,
+        limitations="Noticias jornalisticas e institucionais oficiais da prefeitura; devem ser cruzadas com dados estatisticos estruturados.",
+        source_documents=(
+            SourceDocumentDefinition(
+                id="source:araruama:news",
+                content=(
+                    "Fonte oficial de noticias da Prefeitura Municipal de Araruama para jornalismo "
+                    "de dados sobre o municipio, prefeitura, Araruama, regiao dos lagos, turismo, "
+                    "educacao local, infraestrutura urbana, saude publica local e atos oficiais. "
+                    "Usa varredura direta no portal de noticias da prefeitura no dominio araruama.rj.gov.br. "
+                    "O coletor adequado e build_araruama_news_dataset."
+                ),
+                domains=("araruama.rj.gov.br",),
+                themes=("araruama", "noticias", "prefeitura", "regiao dos lagos", "saude local", "turismo local", "escola local"),
+            ),
+        ),
+    ),
 )
 
 COLLECTORS_BY_SOURCE_TYPE = {
@@ -225,4 +250,6 @@ def collect_dataset(source_type: str, user_request: str, state: StateOption | No
         return build_mortality_dataset(user_request)
     if source_type == OPEN_DATA_SOURCE_TYPE:
         return build_open_data_discovery_dataset(user_request)
+    if source_type == ARARUAMA_NEWS_SOURCE_TYPE:
+        return build_araruama_news_dataset(user_request)
     raise ValueError(f"Coletor sem funcao de execucao configurada: {source_type}")

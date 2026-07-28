@@ -1884,6 +1884,7 @@ class DatasetCompletionCheckTool(BaseTool):
         "ipca_ibge": ("variacao_acumulada_12m", "media_periodo", "observacoes"),
         "emendas_cgu": ("total_empenhado", "total_pago", "registros"),
         "worldbank_wdi": ("indicador_codigo", "valor_mais_recente", "observacoes"),
+        "araruama_news": ("registros",),
     }
 
     def __init__(self, dataset: dict, **kwargs: Any) -> None:

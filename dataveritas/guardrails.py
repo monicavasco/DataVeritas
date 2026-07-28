@@ -17,6 +17,7 @@ ALLOWED_SOURCE_DOMAINS = (
     "camara.leg.br",
     "ghoapi.azureedge.net",
     "gov.br",
+    "araruama.rj.gov.br",
     "jus.br",
     "leg.br",
     "edu.br",

@@ -16,6 +16,7 @@ from dataveritas.collectors import (
     MORTALITY_RJ_SOURCE_TYPE,
     OPEN_DATA_SOURCE_TYPE,
     SELIC_SOURCE_TYPE,
+    ARARUAMA_NEWS_SOURCE_TYPE,
     collect_dataset,
     collector_requires_state,
     get_collector_definition,
@@ -52,6 +53,7 @@ from dataveritas.llm_config import (
 )
 from dataveritas.mortality import MortalityDataset
 from dataveritas.open_data import OpenDataDiscoveryDataset
+from dataveritas.araruama import AraruamaDataset
 from dataveritas.rag import (
     RagRecommendation,
     bootstrap_vector_store,
@@ -73,73 +75,184 @@ st.set_page_config(
 st.markdown(
     """
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap');
+
     :root {
-      --ink: #18211f;
-      --muted: #63706c;
-      --paper: #fbfaf7;
-      --line: #d9ded8;
-      --teal: #1b7f78;
-      --amber: #c27a28;
-      --brick: #a54b3d;
-      --mint: #e2f0ec;
+      --ink: #f0f6fc;
+      --muted: #8b949e;
+      --paper: #0d1117;
+      --line: rgba(240, 246, 252, 0.12);
+      --teal: #00ffcc;
+      --amber: #f5a623;
+      --brick: #ff0055;
+      --mint: rgba(0, 255, 204, 0.1);
+      --sidebar: #161b22;
+      --gradient: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+      --glow: 0 0 15px rgba(0, 242, 254, 0.35);
     }
+
+    * {
+      font-family: 'Outfit', sans-serif !important;
+    }
+
     .stApp {
-      background:
-        linear-gradient(120deg, rgba(226, 240, 236, 0.9), rgba(251, 250, 247, 0.95) 42%, rgba(245, 232, 214, 0.8)),
-        radial-gradient(circle at 10% 10%, rgba(27, 127, 120, 0.08), transparent 28%);
+      background: radial-gradient(circle at 50% 50%, #172033 0%, #0d1117 100%);
       color: var(--ink);
     }
-    [data-testid="stHeader"] { background: transparent; }
+
+    [data-testid="stHeader"] {
+      background: transparent;
+    }
+
     [data-testid="stSidebar"] {
-      background: rgba(251, 250, 247, 0.92);
+      background-color: var(--sidebar) !important;
       border-right: 1px solid var(--line);
+      backdrop-filter: blur(15px);
     }
+
     .dv-title {
-      font-family: Georgia, Cambria, serif;
-      font-size: 2.7rem;
-      line-height: 1;
-      color: var(--ink);
-      margin-bottom: 0.2rem;
+      font-size: 3.2rem;
+      font-weight: 800;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.3rem;
+      letter-spacing: -0.03em;
+      text-shadow: 0 0 30px rgba(0, 242, 254, 0.2);
     }
+
     .dv-subtitle {
       color: var(--muted);
-      font-size: 1.02rem;
-      max-width: 760px;
-      margin-bottom: 1.2rem;
+      font-size: 1.15rem;
+      font-weight: 400;
+      max-width: 800px;
+      margin-bottom: 2rem;
+      letter-spacing: -0.01em;
     }
+
     .metric-shell {
       border: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.7);
-      border-radius: 8px;
-      padding: 0.85rem 1rem;
-      min-height: 92px;
+      background: rgba(22, 27, 34, 0.7);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      min-height: 96px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      backdrop-filter: blur(5px);
     }
+
+    .metric-shell:hover {
+      transform: translateY(-4px);
+      border-color: rgba(0, 242, 254, 0.4);
+      box-shadow: 0 8px 30px rgba(0, 242, 254, 0.25);
+    }
+
     .metric-label {
       color: var(--muted);
-      font-size: 0.78rem;
+      font-size: 0.85rem;
+      font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0;
-      margin-bottom: 0.2rem;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.3rem;
     }
+
     .metric-value {
-      color: var(--ink);
-      font-size: 1.45rem;
+      color: var(--teal);
+      font-size: 1.6rem;
       font-weight: 700;
       line-height: 1.2;
     }
+
     .guardrail-pass {
       border-left: 5px solid var(--teal);
-      background: rgba(226, 240, 236, 0.72);
-      padding: 0.7rem 0.85rem;
-      border-radius: 6px;
-      margin-bottom: 0.55rem;
+      background: rgba(0, 255, 204, 0.06);
+      padding: 0.9rem 1.1rem;
+      border-radius: 8px;
+      margin-bottom: 0.75rem;
+      border-top: 1px solid rgba(0, 255, 204, 0.12);
+      border-right: 1px solid rgba(0, 255, 204, 0.12);
+      border-bottom: 1px solid rgba(0, 255, 204, 0.12);
+      box-shadow: 0 4px 15px rgba(0, 255, 204, 0.03);
     }
+
     .guardrail-block {
       border-left: 5px solid var(--brick);
-      background: rgba(250, 226, 221, 0.76);
-      padding: 0.7rem 0.85rem;
-      border-radius: 6px;
-      margin-bottom: 0.55rem;
+      background: rgba(255, 0, 85, 0.06);
+      padding: 0.9rem 1.1rem;
+      border-radius: 8px;
+      margin-bottom: 0.75rem;
+      border-top: 1px solid rgba(255, 0, 85, 0.12);
+      border-right: 1px solid rgba(255, 0, 85, 0.12);
+      border-bottom: 1px solid rgba(255, 0, 85, 0.12);
+      box-shadow: 0 4px 15px rgba(255, 0, 85, 0.03);
+    }
+
+    /* Primary CTA buttons */
+    div.stButton > button {
+      background: var(--gradient) !important;
+      color: #ffffff !important;
+      font-weight: 700 !important;
+      border: none !important;
+      border-radius: 8px !important;
+      padding: 0.65rem 1.5rem !important;
+      box-shadow: var(--glow) !important;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      width: 100% !important;
+      letter-spacing: 0.03em !important;
+    }
+
+    div.stButton > button:hover {
+      transform: translateY(-2px) !important;
+      box-shadow: 0 0 25px rgba(0, 242, 254, 0.65) !important;
+    }
+
+    div.stButton > button:active {
+      transform: translateY(1px) !important;
+    }
+
+    /* Style tab bars */
+    .stTabs [data-baseweb="tab-list"] {
+      gap: 12px;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+      background-color: rgba(22, 27, 34, 0.4) !important;
+      border: 1px solid var(--line) !important;
+      border-radius: 8px 8px 0px 0px !important;
+      color: var(--muted) !important;
+      padding: 0.5rem 1.5rem !important;
+      font-weight: 600 !important;
+      transition: all 0.2s ease !important;
+    }
+
+    .stTabs [data-baseweb="tab"]:hover {
+      color: var(--ink) !important;
+      background-color: rgba(22, 27, 34, 0.7) !important;
+    }
+
+    .stTabs [aria-selected="true"] {
+      background-color: rgba(22, 27, 34, 0.85) !important;
+      border-bottom: 2px solid #00f2fe !important;
+      color: #00f2fe !important;
+      box-shadow: 0 4px 15px rgba(0, 242, 254, 0.08) !important;
+    }
+
+    /* Inputs/select boxes styling */
+    div[data-baseweb="select"] > div, div[data-baseweb="base-input"] > input {
+      background-color: rgba(13, 17, 23, 0.8) !important;
+    }
+
+    /* Alerts styling */
+    .stAlert {
+      border-radius: 8px !important;
+      border: 1px solid var(--line) !important;
+      background-color: rgba(22, 27, 34, 0.6) !important;
+    }
+
+    /* Table headers styling */
+    div[data-testid="stTable"] th {
+      background-color: rgba(22, 27, 34, 0.8) !important;
+      color: var(--teal) !important;
     }
     </style>
     """,
@@ -301,6 +414,11 @@ def build_selic_frame(dataset: SelicDataset) -> pd.DataFrame:
 
 
 def build_open_data_frame(dataset: OpenDataDiscoveryDataset) -> pd.DataFrame:
+    rows = [asdict(row) for row in dataset.registros]
+    return pd.DataFrame(rows)
+
+
+def build_araruama_frame(dataset: AraruamaDataset) -> pd.DataFrame:
     rows = [asdict(row) for row in dataset.registros]
     return pd.DataFrame(rows)
 
@@ -574,6 +692,18 @@ def render_open_data_overview(dataset: OpenDataDiscoveryDataset) -> None:
     st.dataframe(pd.DataFrame(status_rows), width="stretch", hide_index=True)
 
 
+def render_araruama_overview(dataset: AraruamaDataset) -> None:
+    cols = st.columns(4)
+    with cols[0]:
+        render_metric("Notícias encontradas", str(dataset.registros_encontrados))
+    with cols[1]:
+        render_metric("Fontes citáveis", str(len(dataset.fontes)))
+    with cols[2]:
+        render_metric("Tipo", "Notícias Locais")
+    with cols[3]:
+        render_metric("Status", "OK")
+
+
 def render_dataset_overview(dataset) -> None:
     if getattr(dataset, "tipo", "") == SELIC_SOURCE_TYPE:
         render_selic_overview(dataset)
@@ -585,6 +715,10 @@ def render_dataset_overview(dataset) -> None:
 
     if getattr(dataset, "tipo", "") == OPEN_DATA_SOURCE_TYPE:
         render_open_data_overview(dataset)
+        return
+
+    if getattr(dataset, "tipo", "") == ARARUAMA_NEWS_SOURCE_TYPE:
+        render_araruama_overview(dataset)
         return
 
     render_population_overview(dataset)
@@ -623,6 +757,18 @@ def render_dataset_table(dataset) -> None:
         else:
             st.dataframe(
                 records_df[["origem", "titulo", "data", "tipo", "url"]],
+                width="stretch",
+                hide_index=True,
+            )
+        return
+
+    if getattr(dataset, "tipo", "") == ARARUAMA_NEWS_SOURCE_TYPE:
+        records_df = build_araruama_frame(dataset)
+        if records_df.empty:
+            st.info("Nenhuma notícia de Araruama foi encontrada para os termos pesquisados.")
+        else:
+            st.dataframe(
+                records_df[["data", "titulo", "url"]],
                 width="stretch",
                 hide_index=True,
             )

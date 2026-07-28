@@ -117,6 +117,7 @@ REQUIRED_BY_TYPE: dict[str, tuple] = {
     "ipca_ibge": ("variacao_acumulada_12m", "media_periodo", "observacoes"),
     "emendas_cgu": ("total_empenhado", "total_pago", "registros"),
     "worldbank_wdi": ("indicador_codigo", "valor_mais_recente", "observacoes"),
+    "araruama_news": ("registros",),
 }
 
 
@@ -280,6 +281,18 @@ rc4 = run_verificar_completude({"tipo": "unknown", "fontes": ["https://gov.br/x"
 mostrar(rc4)
 checar(rc4["ok"] is True, "ok == True para tipo sem campos extras obrigatorios")
 checar(rc4["campos_obrigatorios_por_tipo"] == [], "sem campos extras para tipo desconhecido")
+
+cabecalho("Tool C — verificar_completude: araruama_news completo")
+rc5 = run_verificar_completude({
+    "tipo": "araruama_news",
+    "fontes": ["https://www.araruama.rj.gov.br/noticias"],
+    "coletado_em": "2026-07-27",
+    "resumo_numerico": "Notícias",
+    "nota_metodologica": "Método",
+    "registros": [{"data": "27.07.2026", "titulo": "Tainha", "url": "https://www.araruama.rj.gov.br/noticia/tainha"}]
+})
+mostrar(rc5)
+checar(rc5["ok"] is True, "ok == True para araruama_news completo")
 
 print(f"\n{'='*60}")
 print("  TODOS OS TESTES PASSARAM")

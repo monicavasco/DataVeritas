@@ -338,6 +338,9 @@ def _source_keyword_boosts(query: str) -> dict[str, float]:
     ):
         boosts["open_data_discovery"] = max(boosts.get("open_data_discovery", 0.0), 0.62)
 
+    if base_tokens.intersection({"araruama"}):
+        boosts["araruama_news"] = 0.90
+
     return boosts
 
 
