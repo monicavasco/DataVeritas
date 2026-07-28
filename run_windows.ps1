@@ -14,4 +14,5 @@ if (-not (Test-Path $venvStreamlit)) {
 }
 
 Write-Host "Iniciando DataVeritas..."
-& $venvStreamlit run app.py
+$env:STREAMLIT_BROWSER_GATHER_USAGE_STATS = "false"
+& $venvStreamlit run app.py --server.headless true --server.port 8501

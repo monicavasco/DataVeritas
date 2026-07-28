@@ -88,8 +88,16 @@ class LlmSettings:
             "model": crewai_model_name(self.provider, self.model_name),
             "temperature": self.temperature,
             "timeout": self.timeout,
-            "max_tokens": self.max_tokens,
         }
+        if self.provider == PROVIDER_OPENAI:
+            kwargs["max_completion_tokens"] = self.max_tokens
+            if self.model_name.casefold().startswith("gpt-5.6"):
+                # CrewAI 1.15.6 só encaminha o campo reasoning_effort diretamente
+                # para modelos cujo nome contém "o1". additional_params garante
+                # que o valor também chegue ao Chat Completions no GPT-5.6.
+                kwargs["additional_params"] = {"reasoning_effort": "none"}
+        else:
+            kwargs["max_tokens"] = self.max_tokens
         if self.provider == PROVIDER_OLLAMA:
             kwargs["base_url"] = self.base_url or DEFAULT_OLLAMA_BASE_URL
         elif self.base_url:
