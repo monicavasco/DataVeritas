@@ -330,6 +330,66 @@ def _sentences(text: str) -> list[str]:
     return [sentence.strip() for sentence in re.split(r"(?<=[.!?])\s+", compact) if sentence.strip()]
 
 
+def generate_web_story(article: str, max_cards: int = 7) -> dict[str, Any]:
+    """Transforma uma notícia Markdown em um Web Story curto e extrativo."""
+    if max_cards < 3 or max_cards > 10:
+        raise ValueError("max_cards deve estar entre 3 e 10.")
+    lines = [line.strip() for line in (article or "").splitlines() if line.strip()]
+    title = next(
+        (re.sub(r"^#+\s*", "", line).strip() for line in lines if line.startswith("#")),
+        "Resumo da notícia",
+    )
+    ignored_sections = {"como checamos", "auditoria factual", "fontes originais", "fontes"}
+    body_lines: list[str] = []
+    ignore_section = False
+    for line in lines:
+        if line.startswith("#"):
+            ignore_section = _normalize_check_text(re.sub(r"^#+\s*", "", line)) in ignored_sections
+            continue
+        if ignore_section or line.startswith(("-", "*")) or re.match(r"^https?://", line):
+            continue
+        cleaned = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", line)
+        cleaned = re.sub(r"[*_`>]", "", cleaned).strip()
+        if cleaned and cleaned != REQUIRED_DISCLAIMER:
+            body_lines.append(cleaned)
+    candidates = _dedupe(_sentences(" ".join(body_lines)))
+    candidates = [sentence for sentence in candidates if 45 <= len(sentence) <= 280]
+    if not candidates:
+        raise ValueError("A notícia não contém trechos suficientes para gerar o Web Story.")
+    relevance_terms = (
+        "aument", "cresc", "redu", "queda", "maior", "menor", "total",
+        "dados", "resultado", "periodo", "taxa", "percent", "milh", "bilh",
+    )
+
+    def score(item: tuple[int, str]) -> tuple[float, int]:
+        index, sentence = item
+        normalized = _normalize_check_text(sentence)
+        value = max(0.0, 4.0 - index * 0.15)
+        value += min(3, len(_numbers_from_text(sentence))) * 1.5
+        value += sum(0.55 for term in relevance_terms if term in normalized)
+        value += 0.6 if 70 <= len(sentence) <= 190 else 0
+        return value, -index
+
+    remaining_candidates = list(enumerate(candidates))[1:]
+    selected = sorted(
+        sorted(remaining_candidates, key=score, reverse=True)[: max_cards - 2],
+        key=lambda item: item[0],
+    )
+    cards = [
+        {"type": "cover", "title": title, "text": candidates[0]},
+        *[
+            {"type": "content", "title": f"Ponto-chave {position}", "text": sentence}
+            for position, (_, sentence) in enumerate(selected, start=1)
+        ],
+        {
+            "type": "closing",
+            "title": "Leia a notícia completa",
+            "text": "Confira a metodologia, a auditoria factual e as fontes originais.",
+        },
+    ]
+    return {"title": title, "card_count": len(cards), "cards": cards, "generation": "extractive"}
+
+
 def _has_negation_context(sentence: str) -> bool:
     normalized = _normalize_check_text(sentence)
     negation_markers = (

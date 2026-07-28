@@ -11,6 +11,7 @@ from dataveritas.agent_tools import (
     NewsroomToolset,
     build_newsroom_toolset,
     format_tool_executions_for_prompt,
+    generate_web_story,
     run_post_article_tools,
     run_required_tools,
     tool_execution_dicts,
@@ -33,6 +34,7 @@ class PromptDataset(Protocol):
 @dataclass(frozen=True)
 class NewsroomResult:
     article: str
+    web_story: dict[str, Any]
     raw_output: str
     task_outputs: list[str]
     repaired_footer: bool
@@ -296,6 +298,7 @@ def run_newsroom(
 
     return NewsroomResult(
         article=article,
+        web_story=generate_web_story(article),
         raw_output=str(result),
         task_outputs=task_outputs,
         repaired_footer=repaired,
