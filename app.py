@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib
+import json
 import re
 import unicodedata
 from dataclasses import asdict
@@ -1028,7 +1029,7 @@ if not st.session_state.last_result:
 else:
     dataset, newsroom_result, checks, result_rag_recommendation = st.session_state.last_result
 
-    tabs = st.tabs(["Notícia", "Dados", "Guardrails", "RAG"])
+    tabs = st.tabs(["Notícia", "Web Story", "Dados", "Guardrails", "RAG"])
 
     with tabs[0]:
         if newsroom_result:
@@ -1037,11 +1038,26 @@ else:
             st.warning("A notícia não foi gerada porque um guardrail bloqueou o fluxo.")
 
     with tabs[1]:
+        if newsroom_result:
+            for card in newsroom_result.web_story["cards"]:
+                with st.container(border=True):
+                    st.markdown(f"### {card['title']}")
+                    st.write(card["text"])
+            st.download_button(
+                "Baixar Web Story (JSON)",
+                data=json.dumps(newsroom_result.web_story, ensure_ascii=False, indent=2),
+                file_name="web-story.json",
+                mime="application/json",
+            )
+        else:
+            st.info("O Web Story será criado depois que a notícia passar pelos guardrails.")
+
+    with tabs[2]:
         if dataset:
             render_dataset_overview(dataset)
             render_dataset_table(dataset)
 
-    with tabs[2]:
+    with tabs[3]:
         for title, result in checks:
             render_check(title, result)
 
@@ -1083,5 +1099,5 @@ else:
                     st.markdown(f"**Tarefa {index}**")
                     st.text(output[:3000])
 
-    with tabs[3]:
+    with tabs[4]:
         render_rag_context(result_rag_recommendation)
